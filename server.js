@@ -69,6 +69,7 @@ app.use('/api/dashboard',   dashboardRouter)
 app.use('/api/usuarios',    usuariosRouter)
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', app: 'Santiago Rítmica API 🎀' }))
+app.get('/ping', (req, res) => res.send('pong'))
 
 
 async function start() {
