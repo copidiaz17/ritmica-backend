@@ -70,12 +70,6 @@ app.use('/api/usuarios',    usuariosRouter)
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', app: 'Santiago Rítmica API 🎀' }))
 
-// Servir frontend compilado en producción
-if (process.env.NODE_ENV === 'production') {
-  const distPath = join(__dirname, '../frontend/dist')
-  app.use(express.static(distPath))
-  app.get('*', (req, res) => res.sendFile(join(distPath, 'index.html')))
-}
 
 async function start() {
   try {
