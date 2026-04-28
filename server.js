@@ -39,9 +39,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const app  = express()
 const PORT = process.env.PORT || 3001
 
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-  : true
+const allowedOrigins = !process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGINS === '*'
+  ? '*'
+  : process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
 
 app.set('trust proxy', 1)
 app.use(cors({ origin: allowedOrigins, credentials: true }))
