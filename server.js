@@ -39,9 +39,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const app  = express()
 const PORT = process.env.PORT || 3001
 
-const allowedOrigins = !process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGINS === '*'
-  ? '*'
-  : process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+// origin:true refleja el Origin del request — válido con credentials en todos los browsers
+const allowedOrigins = process.env.ALLOWED_ORIGINS && process.env.ALLOWED_ORIGINS !== '*'
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : true
 
 app.set('trust proxy', 1)
 app.use(cors({ origin: allowedOrigins, credentials: true }))
