@@ -19,20 +19,72 @@ async function alumnaIdsDeProfe(profesora_id) {
   return alumnas.map(a => a.id)
 }
 
+// IDs de alumnas que pertenecen a una actividad
+async function alumnaIdsDeActividad(actividad_id) {
+  const alumnas = await Alumna.findAll({
+    where: { activo: true },
+    include: [{ model: Actividad, as: 'actividades', where: { id: actividad_id }, required: true, through: { attributes: [] }, attributes: [] }],
+    attributes: ['id'],
+  })
+  return alumnas.map(a => a.id)
+}
+
+// Intersecta dos arrays de IDs (devuelve los que están en ambos)
+function intersect(a, b) {
+  const setB = new Set(b)
+  return a.filter(x => setB.has(x))
+}
+
 // ── GET /api/cuotas ───────────────────────────────────────────────────────────
 router.get('/', requireAuth, async (req, res) => {
   try {
-    const { mes, anio, alumna_id } = req.query
+    const { mes, anio, alumna_id, fecha_desde, fecha_hasta, actividad_id, profesora_id: profIdFiltro } = req.query
     const where = {}
-    if (mes)       where.mes       = mes
-    if (anio)      where.anio      = anio
+
+    // Filtro por período (mes/anio) o rango de fechas
+    if (fecha_desde || fecha_hasta) {
+      const desde = fecha_desde ? new Date(fecha_desde) : new Date('2000-01-01')
+      const hasta = fecha_hasta ? new Date(fecha_hasta + 'T23:59:59') : new Date()
+      where.fecha_pago = { [Op.between]: [desde, hasta] }
+    } else {
+      if (mes)  where.mes  = mes
+      if (anio) where.anio = anio
+    }
+
     if (alumna_id) where.alumna_id = alumna_id
 
+    // Acumular restricciones de alumna_id por filtros de grupo/profe
+    let idsRestringidos = null // null = sin restricción
+
+    // Filtro por actividad (grupo)
+    if (actividad_id) {
+      const ids = await alumnaIdsDeActividad(actividad_id)
+      idsRestringidos = ids
+    }
+
+    // Filtro por profesora (solo admin/recepcion/lectura)
+    if (profIdFiltro && req.user.rol !== 'profesora') {
+      const ids = await alumnaIdsDeProfe(Number(profIdFiltro))
+      idsRestringidos = idsRestringidos !== null ? intersect(idsRestringidos, ids) : ids
+    }
+
+    // Rol profesora: siempre restringe a sus alumnas
     if (req.user.rol === 'profesora') {
       if (!req.user.profesora_id) return res.json([])
-      const ids = await alumnaIdsDeProfe(req.user.profesora_id)
-      if (!ids.length) return res.json([])
-      where.alumna_id = alumna_id && ids.includes(Number(alumna_id)) ? alumna_id : { [Op.in]: ids }
+      const misIds = await alumnaIdsDeProfe(req.user.profesora_id)
+      if (!misIds.length) return res.json([])
+      idsRestringidos = idsRestringidos !== null ? intersect(idsRestringidos, misIds) : misIds
+    }
+
+    if (idsRestringidos !== null) {
+      if (!idsRestringidos.length) return res.json([])
+      // Combinar con posible alumna_id específica
+      if (alumna_id) {
+        if (!idsRestringidos.includes(Number(alumna_id))) return res.json([])
+        where.alumna_id = alumna_id
+      } else {
+        where.alumna_id = { [Op.in]: idsRestringidos }
+      }
     }
 
     const cuotas = await Cuota.findAll({ where, include: [ALUMNA_INCLUDE], order: [['fecha_pago','DESC']] })
