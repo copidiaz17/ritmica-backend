@@ -82,6 +82,19 @@ async function start() {
     await sequelize.sync()
     console.log('✓ Tablas sincronizadas')
 
+    // Migraciones de columnas nuevas (idempotentes)
+    const migraciones = [
+      { tabla: 'cuotas',  col: 'tipo',      sql: "ALTER TABLE cuotas ADD COLUMN tipo ENUM('cuota','inscripcion') NOT NULL DEFAULT 'cuota' AFTER anio" },
+      { tabla: 'alumnas', col: 'direccion', sql: "ALTER TABLE alumnas ADD COLUMN direccion VARCHAR(255) NULL AFTER apellido" },
+    ]
+    for (const m of migraciones) {
+      const [[existe]] = await sequelize.query(`SHOW COLUMNS FROM ${m.tabla} LIKE '${m.col}'`)
+      if (!existe) {
+        await sequelize.query(m.sql)
+        console.log(`✓ Migración: ${m.tabla}.${m.col} agregada`)
+      }
+    }
+
     // Crear usuario admin por defecto si no existe
     const existe = await Usuario.findOne({ where: { email: 'admin@ritmica.com' } })
     if (!existe) {
