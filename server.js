@@ -34,6 +34,7 @@ import cuotasRouter     from './routes/cuotas.js'
 import cajaRouter       from './routes/caja.js'
 import dashboardRouter  from './routes/dashboard.js'
 import usuariosRouter   from './routes/usuarios.js'
+import sueldosRouter    from './routes/sueldos.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const app  = express()
@@ -68,6 +69,7 @@ app.use('/api/cuotas',      cuotasRouter)
 app.use('/api/caja',        cajaRouter)
 app.use('/api/dashboard',   dashboardRouter)
 app.use('/api/usuarios',    usuariosRouter)
+app.use('/api/sueldos',     sueldosRouter)
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', app: 'Santiago Rítmica API 🎀' }))
 app.get('/ping', (req, res) => res.send('pong'))
