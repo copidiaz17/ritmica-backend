@@ -7,6 +7,7 @@ const Cuota = sequelize.define('Cuota', {
   alumna_id:    { type: DataTypes.INTEGER, allowNull: false },
   mes:          { type: DataTypes.INTEGER, allowNull: false },   // 1-12
   anio:         { type: DataTypes.INTEGER, allowNull: false },
+  tipo:         { type: DataTypes.ENUM('cuota','inscripcion'), allowNull: false, defaultValue: 'cuota' },
   monto:        { type: DataTypes.DECIMAL(10,2), allowNull: false },
   fecha_pago:   { type: DataTypes.DATEONLY, allowNull: false },
   medio_pago:   { type: DataTypes.ENUM('efectivo','transferencia','tarjeta','mercadopago'), defaultValue: 'efectivo' },

@@ -5,6 +5,7 @@ const Alumna = sequelize.define('Alumna', {
   id:                      { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   nombre:                  { type: DataTypes.STRING(100), allowNull: false },
   apellido:                { type: DataTypes.STRING(100), allowNull: false },
+  direccion:               { type: DataTypes.STRING(255) },
   apodo:                   { type: DataTypes.STRING(50) },
   fecha_nacimiento:        { type: DataTypes.DATEONLY },
   genero:                  { type: DataTypes.ENUM('femenino','masculino','otro') },
