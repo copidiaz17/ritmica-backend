@@ -1,16 +1,11 @@
 import { Router } from 'express'
-import { Op } from 'sequelize'
-import Cuota from '../models/Cuota.js'
-import Alumna from '../models/Alumna.js'
-import Actividad from '../models/Actividad.js'
-import Profesora from '../models/Profesora.js'
+import { sequelize } from '../database.js'
 import { requireAuth } from '../middleware/auth.js'
 
 const router = Router()
 const PORCENTAJE = 0.40
 
 // GET /api/sueldos?mes=X&anio=Y
-// Devuelve el sueldo de cada profesora activa para el período indicado
 router.get('/', requireAuth, async (req, res) => {
   try {
     if (!['admin', 'recepcion'].includes(req.user.rol)) {
@@ -21,53 +16,46 @@ router.get('/', requireAuth, async (req, res) => {
     const anio = Number(req.query.anio)
     if (!mes || !anio) return res.status(400).json({ error: 'mes y anio son requeridos' })
 
-    const profesoras = await Profesora.findAll({ where: { activo: true }, order: [['apellido','ASC'],['nombre','ASC']] })
+    // Profesoras activas
+    const [profesoras] = await sequelize.query(
+      `SELECT id, nombre, apellido FROM profesoras WHERE activo = 1 ORDER BY apellido, nombre`
+    )
 
+    // Para cada profesora: alumnas en sus grupos + cuotas del período
     const resultado = await Promise.all(profesoras.map(async (profe) => {
-      // Alumnas de esta profesora (vía actividades)
-      const alumnas = await Alumna.findAll({
-        where: { activo: true },
-        attributes: ['id', 'nombre', 'apellido'],
-        include: [{
-          model: Actividad,
-          as: 'actividades',
-          where: { profesora_id: profe.id },
-          required: true,
-          through: { attributes: [] },
-          attributes: ['id', 'nombre'],
-        }],
-      })
+      // Contar alumnas únicas en los grupos de esta profesora
+      const [[{ alumnas_count }]] = await sequelize.query(`
+        SELECT COUNT(DISTINCT aa.alumna_id) as alumnas_count
+        FROM actividades act
+        JOIN alumna_actividades aa ON aa.actividad_id = act.id
+        WHERE act.profesora_id = ? AND act.activo = 1
+      `, { replacements: [profe.id] })
 
-      const alumnaIds = alumnas.map(a => a.id)
-      if (!alumnaIds.length) {
-        return {
-          profesora: { id: profe.id, nombre: profe.nombre, apellido: profe.apellido },
-          alumnas_count: 0,
-          total_cuotas: 0,
-          sueldo: 0,
-          detalle: [],
-        }
-      }
-
-      // Cuotas del período (mes/anio de la cuota, NO fecha_pago)
-      const cuotas = await Cuota.findAll({
-        where: { alumna_id: { [Op.in]: alumnaIds }, mes, anio },
-        include: [{ model: Alumna, as: 'alumna', attributes: ['id','nombre','apellido'] }],
-        order: [['alumna', 'apellido', 'ASC']],
-      })
+      // Cuotas del período de esas alumnas (con detalle)
+      const [cuotas] = await sequelize.query(`
+        SELECT c.id, c.monto, c.tipo, c.medio_pago, c.fecha_pago,
+               a.id as alumna_id, a.nombre as alumna_nombre, a.apellido as alumna_apellido
+        FROM cuotas c
+        JOIN alumna_actividades aa ON aa.alumna_id = c.alumna_id
+        JOIN actividades act ON act.id = aa.actividad_id AND act.profesora_id = ? AND act.activo = 1
+        JOIN alumnas a ON a.id = c.alumna_id
+        WHERE c.mes = ? AND c.anio = ?
+        GROUP BY c.id
+        ORDER BY a.apellido, a.nombre
+      `, { replacements: [profe.id, mes, anio] })
 
       const total_cuotas = cuotas.reduce((s, c) => s + Number(c.monto), 0)
 
       return {
         profesora: { id: profe.id, nombre: profe.nombre, apellido: profe.apellido },
-        alumnas_count: alumnaIds.length,
+        alumnas_count: Number(alumnas_count),
         total_cuotas,
         sueldo: Math.round(total_cuotas * PORCENTAJE),
         detalle: cuotas.map(c => ({
           id: c.id,
-          alumna: c.alumna,
+          alumna: { id: c.alumna_id, nombre: c.alumna_nombre, apellido: c.alumna_apellido },
           monto: Number(c.monto),
-          tipo: c.tipo,
+          tipo: c.tipo || 'cuota',
           medio_pago: c.medio_pago,
           fecha_pago: c.fecha_pago,
         })),
@@ -76,6 +64,7 @@ router.get('/', requireAuth, async (req, res) => {
 
     res.json({ mes, anio, porcentaje: PORCENTAJE, profesoras: resultado })
   } catch (err) {
+    console.error('sueldos error:', err.message)
     res.status(500).json({ error: err.message })
   }
 })
