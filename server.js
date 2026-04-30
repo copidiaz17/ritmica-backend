@@ -98,8 +98,8 @@ async function migrar() {
     gabrielaId = gabriela.id
     await sequelize.query(`UPDATE profesoras SET activo = 1 WHERE id = ${gabrielaId}`)
   } else {
-    const [r] = await sequelize.query(`INSERT INTO profesoras (nombre, apellido, email, activo) VALUES ('Gabriela','Vega','gabrielavega@ritmica.com',1)`)
-    gabrielaId = r.insertId
+    const [gabrielaIdNew] = await sequelize.query(`INSERT INTO profesoras (nombre, apellido, email, activo) VALUES ('Gabriela','Vega','gabrielavega@ritmica.com',1)`)
+    gabrielaId = gabrielaIdNew
     console.log(`✓ Profesora Gabriela Vega creada (id=${gabrielaId})`)
   }
   // Usuario de Gabriela
