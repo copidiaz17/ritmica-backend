@@ -33,9 +33,11 @@ router.get('/', requireAuth, async (req, res) => {
       // - grupo compartido (dos profes):     20%
       const [cuotas] = await sequelize.query(`
         SELECT c.id, c.monto, c.tipo, c.medio_pago, c.fecha_pago,
-               act.nombre as grupo_nombre,
-               CASE WHEN act.profesora_id_2 IS NOT NULL THEN 0.20 ELSE 0.40 END as porcentaje,
-               a.id as alumna_id, a.nombre as alumna_nombre, a.apellido as alumna_apellido
+               ANY_VALUE(act.nombre) as grupo_nombre,
+               ANY_VALUE(CASE WHEN act.profesora_id_2 IS NOT NULL THEN 0.20 ELSE 0.40 END) as porcentaje,
+               ANY_VALUE(a.id) as alumna_id,
+               ANY_VALUE(a.nombre) as alumna_nombre,
+               ANY_VALUE(a.apellido) as alumna_apellido
         FROM cuotas c
         JOIN alumna_actividades aa ON aa.alumna_id = c.alumna_id
         JOIN actividades act ON act.id = aa.actividad_id
@@ -44,7 +46,7 @@ router.get('/', requireAuth, async (req, res) => {
         JOIN alumnas a ON a.id = c.alumna_id
         WHERE c.mes = ? AND c.anio = ?
         GROUP BY c.id
-        ORDER BY a.apellido, a.nombre
+        ORDER BY ANY_VALUE(a.apellido), ANY_VALUE(a.nombre)
       `, { replacements: [profe.id, profe.id, mes, anio] })
 
       const total_cuotas = cuotas.reduce((s, c) => s + Number(c.monto), 0)
