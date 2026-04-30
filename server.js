@@ -146,6 +146,17 @@ async function migrar() {
     console.log('✓ Grupo 8 creado (Laura)')
   }
 
+  // ── 5b. Crear usuario Rocío Toloza (recepcion) si no existe ─────────────
+  const [[uRocio]] = await sequelize.query(`SELECT id FROM usuarios WHERE email = 'rociotoloza@ritmica.com'`)
+  if (!uRocio) {
+    const hash = await Usuario.hashPassword('Rocio2026')
+    await sequelize.query(
+      `INSERT INTO usuarios (nombre, email, password, rol, activo) VALUES ('Rocío Toloza','rociotoloza@ritmica.com',?,'recepcion',1)`,
+      { replacements: [hash] }
+    )
+    console.log('✓ Usuario rociotoloza@ritmica.com creado')
+  }
+
   // ── 6. Desactivar grupos Anexo y Folclore (y limpiar alumna_actividades) ──
   const idsEliminar = [3, 5, 6, 18]
   await sequelize.query(`DELETE FROM alumna_actividades WHERE actividad_id IN (${idsEliminar.join(',')})`)
