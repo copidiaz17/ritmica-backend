@@ -151,6 +151,39 @@ router.put('/:id', requireAuth, async (req, res) => {
   }
 })
 
+// ── PUT /api/alumnas/:id/cambiar-grupo (solo profesoras) ─────────────────────
+router.put('/:id/cambiar-grupo', requireAuth, async (req, res) => {
+  try {
+    if (req.user.rol !== 'profesora' || !req.user.profesora_id) {
+      return res.status(403).json({ error: 'Solo profesoras pueden usar este endpoint' })
+    }
+    const { actividad_id_nueva } = req.body
+    if (!actividad_id_nueva) return res.status(400).json({ error: 'actividad_id_nueva es requerido' })
+
+    const alumna = await Alumna.findByPk(req.params.id, { include: INCLUDE })
+    if (!alumna) return res.status(404).json({ error: 'Alumna no encontrada' })
+
+    // Verificar que la alumna pertenece a uno de los grupos de esta profesora
+    const misActIds = await actividadesDeProfe(req.user.profesora_id)
+    const alumnaEnMiGrupo = alumna.actividades?.some(a => misActIds.includes(a.id))
+    if (!alumnaEnMiGrupo) return res.status(403).json({ error: 'La alumna no pertenece a tus grupos' })
+
+    // Verificar que el grupo destino existe y está activo
+    const actNueva = await Actividad.findOne({ where: { id: actividad_id_nueva, activo: true } })
+    if (!actNueva) return res.status(404).json({ error: 'Grupo destino no encontrado' })
+
+    // Quitar de los grupos de esta profesora y agregar al nuevo grupo
+    const otrasActividades = alumna.actividades
+      .filter(a => !misActIds.includes(a.id))
+      .map(a => a.id)
+    await alumna.setActividades([...otrasActividades, Number(actividad_id_nueva)])
+
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // ── POST /api/alumnas/:id/foto ────────────────────────────────────────────────
 router.post('/:id/foto', requireAuth, upload.single('foto'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No se recibió imagen' })
