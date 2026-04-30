@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { Op } from 'sequelize'
 import Actividad from '../models/Actividad.js'
 import Sede from '../models/Sede.js'
 import Profesora from '../models/Profesora.js'
@@ -10,10 +11,11 @@ router.get('/', requireAuth, async (req, res) => {
   const { sede_id } = req.query
   const where = { activo: true }
   if (sede_id) where.sede_id = sede_id
-  // Profesora solo ve sus propios grupos
+  // Profesora ve todos sus grupos (tanto donde es prof_1 como prof_2)
   if (req.user.rol === 'profesora') {
     if (!req.user.profesora_id) return res.json([])
-    where.profesora_id = req.user.profesora_id
+    const pid = req.user.profesora_id
+    where[Op.or] = [{ profesora_id: pid }, { profesora_id_2: pid }]
   }
   const list = await Actividad.findAll({
     where,

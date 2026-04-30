@@ -35,7 +35,10 @@ const INCLUDE = [
 
 // IDs de actividades que pertenecen a la profesora
 async function actividadesDeProfe(profesora_id) {
-  const acts = await Actividad.findAll({ where: { profesora_id }, attributes: ['id'] })
+  const acts = await Actividad.findAll({
+    where: { [Op.or]: [{ profesora_id }, { profesora_id_2: profesora_id }], activo: true },
+    attributes: ['id'],
+  })
   return acts.map(a => a.id)
 }
 
@@ -54,7 +57,12 @@ router.get('/', requireAuth, async (req, res) => {
     // Profesora: solo ve alumnas de sus grupos
     if (req.user.rol === 'profesora') {
       if (!req.user.profesora_id) return res.json([])
-      const include = [{ ...INCLUDE[0], where: { profesora_id: req.user.profesora_id }, required: true }]
+      const pid = req.user.profesora_id
+      const include = [{
+        ...INCLUDE[0],
+        where: { [Op.or]: [{ profesora_id: pid }, { profesora_id_2: pid }] },
+        required: true,
+      }]
       const alumnas = await Alumna.findAll({ where, include, order: [['apellido','ASC'],['nombre','ASC']] })
       return res.json(alumnas)
     }
@@ -151,32 +159,31 @@ router.put('/:id', requireAuth, async (req, res) => {
   }
 })
 
-// ── PUT /api/alumnas/:id/cambiar-grupo (solo profesoras) ─────────────────────
+// ── PUT /api/alumnas/:id/cambiar-grupo ───────────────────────────────────────
 router.put('/:id/cambiar-grupo', requireAuth, async (req, res) => {
   try {
-    if (req.user.rol !== 'profesora' || !req.user.profesora_id) {
-      return res.status(403).json({ error: 'Solo profesoras pueden usar este endpoint' })
-    }
     const { actividad_id_nueva } = req.body
     if (!actividad_id_nueva) return res.status(400).json({ error: 'actividad_id_nueva es requerido' })
 
     const alumna = await Alumna.findByPk(req.params.id, { include: INCLUDE })
     if (!alumna) return res.status(404).json({ error: 'Alumna no encontrada' })
 
-    // Verificar que la alumna pertenece a uno de los grupos de esta profesora
-    const misActIds = await actividadesDeProfe(req.user.profesora_id)
-    const alumnaEnMiGrupo = alumna.actividades?.some(a => misActIds.includes(a.id))
-    if (!alumnaEnMiGrupo) return res.status(403).json({ error: 'La alumna no pertenece a tus grupos' })
-
-    // Verificar que el grupo destino existe y está activo
     const actNueva = await Actividad.findOne({ where: { id: actividad_id_nueva, activo: true } })
     if (!actNueva) return res.status(404).json({ error: 'Grupo destino no encontrado' })
 
-    // Quitar de los grupos de esta profesora y agregar al nuevo grupo
-    const otrasActividades = alumna.actividades
-      .filter(a => !misActIds.includes(a.id))
-      .map(a => a.id)
-    await alumna.setActividades([...otrasActividades, Number(actividad_id_nueva)])
+    if (req.user.rol === 'profesora') {
+      // Profesora: solo puede mover alumnas de sus propios grupos
+      if (!req.user.profesora_id) return res.status(403).json({ error: 'Sin acceso' })
+      const misActIds = await actividadesDeProfe(req.user.profesora_id)
+      const alumnaEnMiGrupo = alumna.actividades?.some(a => misActIds.includes(a.id))
+      if (!alumnaEnMiGrupo) return res.status(403).json({ error: 'La alumna no pertenece a tus grupos' })
+      // Quitar de los grupos de esta profesora y poner en el nuevo
+      const otras = alumna.actividades.filter(a => !misActIds.includes(a.id)).map(a => a.id)
+      await alumna.setActividades([...otras, Number(actividad_id_nueva)])
+    } else {
+      // Admin / recepcion: reemplaza TODOS los grupos por el nuevo
+      await alumna.setActividades([Number(actividad_id_nueva)])
+    }
 
     res.json({ ok: true })
   } catch (err) {
