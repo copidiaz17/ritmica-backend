@@ -8,7 +8,7 @@ const router = Router()
 
 router.get('/', requireAuth, async (req, res) => {
   const { sede_id } = req.query
-  const where = {}
+  const where = { activo: true }
   if (sede_id) where.sede_id = sede_id
   // Profesora solo ve sus propios grupos
   if (req.user.rol === 'profesora') {
