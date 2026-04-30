@@ -9,7 +9,8 @@ const Actividad = sequelize.define('Actividad', {
   descripcion: { type: DataTypes.TEXT },
   capacidad:   { type: DataTypes.INTEGER, defaultValue: 20 },
   sede_id:     { type: DataTypes.INTEGER, allowNull: false },
-  profesora_id:{ type: DataTypes.INTEGER },
+  profesora_id: { type: DataTypes.INTEGER },
+  profesora_id_2: { type: DataTypes.INTEGER },
   // Horarios como JSON simple: [{dia: 'Lunes', hora_inicio: '09:00', hora_fin: '10:00'}]
   horarios:    { type: DataTypes.JSON },
   mensualidad: { type: DataTypes.DECIMAL(10,2), defaultValue: 0 },

@@ -5,7 +5,7 @@ import { requireAuth } from '../middleware/auth.js'
 const router = Router()
 
 router.get('/', requireAuth, async (req, res) => {
-  const profesoras = await Profesora.findAll({ order: [['apellido', 'ASC'], ['nombre', 'ASC']] })
+  const profesoras = await Profesora.findAll({ where: { activo: true }, order: [['apellido', 'ASC'], ['nombre', 'ASC']] })
   res.json(profesoras)
 })
 
