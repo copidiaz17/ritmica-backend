@@ -48,7 +48,8 @@ app.set('trust proxy', 1)
 app.use(cors({ origin: allowedOrigins, credentials: true }))
 app.use(express.json())
 
-app.use('/fotos', express.static(join(__dirname, 'public/fotos')))
+app.use('/fotos',        express.static(join(__dirname, 'public/fotos')))
+app.use('/comprobantes', express.static(join(__dirname, 'public/comprobantes')))
 
 app.use('/api', rateLimit({
   windowMs: 60 * 1000, max: 200,
@@ -75,9 +76,10 @@ app.get('/ping', (req, res) => res.send('pong'))
 async function migrar() {
   // ── 1. Columnas nuevas ────────────────────────────────────────────────────
   const colsMigrations = [
-    { tabla: 'cuotas',      col: 'tipo',          sql: "ALTER TABLE cuotas ADD COLUMN tipo ENUM('cuota','inscripcion') NOT NULL DEFAULT 'cuota' AFTER anio" },
-    { tabla: 'alumnas',     col: 'direccion',     sql: "ALTER TABLE alumnas ADD COLUMN direccion VARCHAR(255) NULL AFTER apellido" },
+    { tabla: 'cuotas',      col: 'tipo',           sql: "ALTER TABLE cuotas ADD COLUMN tipo ENUM('cuota','inscripcion') NOT NULL DEFAULT 'cuota' AFTER anio" },
+    { tabla: 'alumnas',     col: 'direccion',      sql: "ALTER TABLE alumnas ADD COLUMN direccion VARCHAR(255) NULL AFTER apellido" },
     { tabla: 'actividades', col: 'profesora_id_2', sql: "ALTER TABLE actividades ADD COLUMN profesora_id_2 INT NULL AFTER profesora_id" },
+    { tabla: 'cuotas',      col: 'comprobante',    sql: "ALTER TABLE cuotas ADD COLUMN comprobante VARCHAR(500) NULL" },
   ]
   for (const m of colsMigrations) {
     const [[existe]] = await sequelize.query(`SHOW COLUMNS FROM ${m.tabla} LIKE '${m.col}'`)

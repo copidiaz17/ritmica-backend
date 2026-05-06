@@ -107,9 +107,11 @@ router.get('/:id', requireAuth, async (req, res) => {
     const alumna = await Alumna.findByPk(req.params.id, { include: INCLUDE })
     if (!alumna) return res.status(404).json({ error: 'No encontrada' })
 
-    // Profesora: verificar que la alumna pertenece a sus grupos
+    // Profesora: verificar que la alumna pertenece a sus grupos (prof_1 o prof_2)
     if (req.user.rol === 'profesora' && req.user.profesora_id) {
-      const perteneceAMiGrupo = alumna.actividades?.some(a => a.profesora?.id === req.user.profesora_id)
+      const pid = req.user.profesora_id
+      const misIds = await actividadesDeProfe(pid)
+      const perteneceAMiGrupo = alumna.actividades?.some(a => misIds.includes(a.id))
       if (!perteneceAMiGrupo) return res.status(403).json({ error: 'Acceso denegado' })
     }
 

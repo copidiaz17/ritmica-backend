@@ -13,6 +13,7 @@ const Cuota = sequelize.define('Cuota', {
   medio_pago:   { type: DataTypes.ENUM('efectivo','transferencia','tarjeta','mercadopago'), defaultValue: 'efectivo' },
   recibo_nro:   { type: DataTypes.INTEGER },
   observacion:  { type: DataTypes.TEXT },
+  comprobante:  { type: DataTypes.STRING(500) },
 }, { tableName: 'cuotas', timestamps: false })
 
 Cuota.belongsTo(Alumna, { foreignKey: 'alumna_id', as: 'alumna' })
