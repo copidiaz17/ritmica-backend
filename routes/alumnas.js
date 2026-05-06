@@ -54,15 +54,14 @@ router.get('/', requireAuth, async (req, res) => {
       { documento:{ [Op.like]: `%${q}%` } },
     ]
 
-    // Profesora: solo ve alumnas de sus grupos
+    // Profesora: solo ve alumnas de sus grupos, con filtro de actividad opcional
     if (req.user.rol === 'profesora') {
       if (!req.user.profesora_id) return res.json([])
       const pid = req.user.profesora_id
-      const include = [{
-        ...INCLUDE[0],
-        where: { [Op.or]: [{ profesora_id: pid }, { profesora_id_2: pid }] },
-        required: true,
-      }]
+      const actWhere = actividad_id
+        ? { id: actividad_id }
+        : { [Op.or]: [{ profesora_id: pid }, { profesora_id_2: pid }] }
+      const include = [{ ...INCLUDE[0], where: actWhere, required: true }]
       const alumnas = await Alumna.findAll({ where, include, order: [['apellido','ASC'],['nombre','ASC']] })
       return res.json(alumnas)
     }
