@@ -14,6 +14,7 @@ const Cuota = sequelize.define('Cuota', {
   recibo_nro:   { type: DataTypes.INTEGER },
   observacion:  { type: DataTypes.TEXT },
   comprobante:  { type: DataTypes.STRING(500) },
+  actividad_id: { type: DataTypes.INTEGER, allowNull: true },
 }, { tableName: 'cuotas', timestamps: false })
 
 Cuota.belongsTo(Alumna, { foreignKey: 'alumna_id', as: 'alumna' })

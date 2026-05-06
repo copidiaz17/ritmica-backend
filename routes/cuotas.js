@@ -3,6 +3,7 @@ import { Op } from 'sequelize'
 import Cuota from '../models/Cuota.js'
 import Alumna from '../models/Alumna.js'
 import Actividad from '../models/Actividad.js'
+import AlumnaActividad from '../models/AlumnaActividad.js'
 import { requireAuth } from '../middleware/auth.js'
 import multer from 'multer'
 import { join, dirname } from 'path'
@@ -158,6 +159,21 @@ router.post('/', requireAuth, async (req, res) => {
         return res.status(403).json({ error: 'La alumna no pertenece a tu grupo' })
     }
     const cuota = await Cuota.create(req.body)
+
+    // Si la cuota es para una actividad en la que la alumna no está inscripta, inscribirla
+    if (req.body.actividad_id) {
+      const ya = await AlumnaActividad.findOne({
+        where: { alumna_id: req.body.alumna_id, actividad_id: req.body.actividad_id },
+      })
+      if (!ya) {
+        await AlumnaActividad.create({
+          alumna_id:    req.body.alumna_id,
+          actividad_id: req.body.actividad_id,
+          fecha_inicio: req.body.fecha_pago || new Date().toISOString().slice(0, 10),
+        })
+      }
+    }
+
     res.json(cuota)
   } catch (err) {
     res.status(400).json({ error: err.message })

@@ -80,6 +80,7 @@ async function migrar() {
     { tabla: 'alumnas',     col: 'direccion',      sql: "ALTER TABLE alumnas ADD COLUMN direccion VARCHAR(255) NULL AFTER apellido" },
     { tabla: 'actividades', col: 'profesora_id_2', sql: "ALTER TABLE actividades ADD COLUMN profesora_id_2 INT NULL AFTER profesora_id" },
     { tabla: 'cuotas',      col: 'comprobante',    sql: "ALTER TABLE cuotas ADD COLUMN comprobante VARCHAR(500) NULL" },
+    { tabla: 'cuotas',      col: 'actividad_id',   sql: "ALTER TABLE cuotas ADD COLUMN actividad_id INT NULL" },
   ]
   for (const m of colsMigrations) {
     const [[existe]] = await sequelize.query(`SHOW COLUMNS FROM ${m.tabla} LIKE '${m.col}'`)
@@ -164,6 +165,18 @@ async function migrar() {
   await sequelize.query(`DELETE FROM alumna_actividades WHERE actividad_id IN (${idsEliminar.join(',')})`)
   await sequelize.query(`UPDATE actividades SET activo = 0 WHERE id IN (${idsEliminar.join(',')})`)
   console.log('✓ Grupos Anexo y Folclore desactivados')
+
+  // ── 7. Crear Danza Fusión si no existe (a cargo de Eugenia Molina, id=3) ──
+  const [[danzaFusion]] = await sequelize.query(`SELECT id FROM actividades WHERE nombre LIKE '%Danza Fusi%'`)
+  if (!danzaFusion) {
+    const [[sedeRef]] = await sequelize.query(`SELECT sede_id FROM actividades WHERE activo = 1 LIMIT 1`)
+    const sedeId = sedeRef?.sede_id || 1
+    await sequelize.query(
+      `INSERT INTO actividades (nombre, descripcion, sede_id, profesora_id, capacidad, horarios, mensualidad, activo) VALUES ('Danza Fusión', 'Clase de sábados a cargo de Eugenia Molina', ?, 3, 30, '[{"dia":"Sábado","hora_inicio":"10:00","hora_fin":"11:00"}]', 0, 1)`,
+      { replacements: [sedeId] }
+    )
+    console.log('✓ Actividad Danza Fusión creada')
+  }
 }
 
 async function start() {
