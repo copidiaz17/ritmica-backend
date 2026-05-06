@@ -11,11 +11,15 @@ router.get('/', requireAuth, async (req, res) => {
   const { sede_id } = req.query
   const where = { activo: true }
   if (sede_id) where.sede_id = sede_id
-  // Profesora ve todos sus grupos (tanto donde es prof_1 como prof_2)
+  // Profesora ve sus grupos + siempre Danza Fusión (para poder registrar ese pago)
   if (req.user.rol === 'profesora') {
     if (!req.user.profesora_id) return res.json([])
     const pid = req.user.profesora_id
-    where[Op.or] = [{ profesora_id: pid }, { profesora_id_2: pid }]
+    where[Op.or] = [
+      { profesora_id: pid },
+      { profesora_id_2: pid },
+      { nombre: { [Op.like]: '%Danza Fusi%' } },
+    ]
   }
   const list = await Actividad.findAll({
     where,
