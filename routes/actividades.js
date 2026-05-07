@@ -35,17 +35,23 @@ router.get('/', requireAuth, async (req, res) => {
 // Devuelve Danza Fusión (la crea si no existe) — sin filtro de rol
 router.get('/danza-fusion', requireAuth, async (req, res) => {
   try {
-    let act = await Actividad.findOne({ where: { nombre: { [Op.like]: '%Danza Fusi%' }, activo: true } })
-    if (!act) {
-      const ref = await Actividad.findOne({ where: { activo: true }, attributes: ['sede_id'] })
+    // Buscar sin filtrar por activo para encontrarla aunque esté desactivada
+    let act = await Actividad.findOne({ where: { nombre: { [Op.like]: '%Danza Fusi%' } } })
+    if (act) {
+      // Reactivar si estaba inactiva
+      if (!act.activo) await act.update({ activo: true })
+    } else {
+      // Buscar a Eugenia por nombre para no depender del ID hardcodeado
+      const eugenia = await Profesora.findOne({ where: { nombre: { [Op.like]: '%Eugenia%' } } })
+      const ref     = await Actividad.findOne({ where: { activo: true }, attributes: ['sede_id'] })
       act = await Actividad.create({
-        nombre: 'Danza Fusión',
-        descripcion: 'Clase de sábados a cargo de Eugenia Molina',
-        sede_id: ref?.sede_id || 1,
-        profesora_id: 3,
-        capacidad: 30,
-        mensualidad: 0,
-        activo: true,
+        nombre:       'Danza Fusión',
+        descripcion:  'Clase de sábados a cargo de Eugenia Molina',
+        sede_id:      ref?.sede_id || 1,
+        profesora_id: eugenia?.id || null,
+        capacidad:    30,
+        mensualidad:  0,
+        activo:       true,
       })
     }
     res.json(act)
