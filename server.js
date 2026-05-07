@@ -166,46 +166,63 @@ async function migrar() {
   await sequelize.query(`UPDATE actividades SET activo = 0 WHERE id IN (${idsEliminar.join(',')})`)
   console.log('✓ Grupos Anexo y Folclore desactivados')
 
-  // ── 7. Crear Danza Fusión si no existe (a cargo de Eugenia Molina, id=3) ──
-  const [[danzaFusion]] = await sequelize.query(`SELECT id FROM actividades WHERE nombre LIKE '%Danza Fusi%'`)
+  // ── 7. Danza Fusión: crear si no existe, y SIEMPRE asignar Eugenia Molina ──
+  const [[eugeniaMolina]] = await sequelize.query(`SELECT id FROM profesoras WHERE nombre LIKE '%Eugenia%' AND activo = 1 LIMIT 1`)
+  let [[danzaFusion]] = await sequelize.query(`SELECT id, profesora_id FROM actividades WHERE nombre LIKE '%Danza Fusi%' LIMIT 1`)
   if (!danzaFusion) {
-    const [[sedeRef]] = await sequelize.query(`SELECT sede_id FROM actividades WHERE activo = 1 LIMIT 1`)
-    const sedeId = sedeRef?.sede_id || 1
+    const [[sedeRef]] = await sequelize.query(`SELECT id FROM sedes WHERE activo = 1 LIMIT 1`)
+    const sedeId = sedeRef?.id || 1
     await sequelize.query(
-      `INSERT INTO actividades (nombre, descripcion, sede_id, profesora_id, capacidad, horarios, mensualidad, activo) VALUES ('Danza Fusión', 'Clase de sábados a cargo de Eugenia Molina', ?, 3, 30, '[{"dia":"Sábado","hora_inicio":"10:00","hora_fin":"11:00"}]', 0, 1)`,
-      { replacements: [sedeId] }
+      `INSERT INTO actividades (nombre, descripcion, sede_id, profesora_id, capacidad, horarios, mensualidad, activo) VALUES ('Danza Fusión', 'Clase de sábados a cargo de Eugenia Molina', ?, ?, 30, '[{"dia":"Sábado","hora_inicio":"10:00","hora_fin":"11:00"}]', 0, 1)`,
+      { replacements: [sedeId, eugeniaMolina?.id || null] }
     )
-    console.log('✓ Actividad Danza Fusión creada')
+    console.log('✓ Actividad Danza Fusión creada con Eugenia Molina')
+  } else {
+    // Siempre actualizar: activar y asignar Eugenia si está disponible
+    const eugeniaId = eugeniaMolina?.id || danzaFusion.profesora_id || null
+    await sequelize.query(
+      `UPDATE actividades SET activo = 1, profesora_id = ? WHERE id = ?`,
+      { replacements: [eugeniaId, danzaFusion.id] }
+    )
+    console.log(`✓ Danza Fusión actualizada: activo=1, profesora_id=${eugeniaId}`)
   }
 
   // ── 8. Sedes: dejar solo Gimnasio Principal Suarez y Gimnasio Sur - Los Flores ──
-  // Asegurar que existe Gimnasio Principal Suarez
-  let [[sedePrincipal]] = await sequelize.query(`SELECT id FROM sedes WHERE nombre LIKE '%Principal%' OR nombre LIKE '%Suarez%' OR nombre LIKE '%Suárez%' LIMIT 1`)
+  // Traer todas las sedes ordenadas por id para trabajar con ellas
+  const [todasLasSedes] = await sequelize.query(`SELECT id, nombre FROM sedes ORDER BY id ASC`)
+
+  // Buscar sede principal por nombre exacto primero, luego por patrón
+  let sedePrincipal = todasLasSedes.find(s => s.nombre === 'Gimnasio Principal Suarez')
+    || todasLasSedes.find(s => /principal|suarez|suárez/i.test(s.nombre))
+    || todasLasSedes[0]
+
   if (!sedePrincipal) {
     const [newId] = await sequelize.query(`INSERT INTO sedes (nombre, activo) VALUES ('Gimnasio Principal Suarez', 1)`)
     sedePrincipal = { id: newId }
-    console.log('✓ Sede Gimnasio Principal Suarez creada')
   } else {
     await sequelize.query(`UPDATE sedes SET nombre = 'Gimnasio Principal Suarez', activo = 1 WHERE id = ${sedePrincipal.id}`)
   }
 
-  // Asegurar que existe Gimnasio Sur - Los Flores
-  let [[sedeSur]] = await sequelize.query(`SELECT id FROM sedes WHERE nombre LIKE '%Sur%' OR nombre LIKE '%Flores%' LIMIT 1`)
+  // Buscar sede Sur excluyendo la principal
+  const restantes = todasLasSedes.filter(s => s.id !== sedePrincipal.id)
+  let sedeSur = restantes.find(s => s.nombre === 'Gimnasio Sur - Los Flores')
+    || restantes.find(s => /sur|flores/i.test(s.nombre))
+    || restantes[0]
+
   if (!sedeSur) {
     const [newId] = await sequelize.query(`INSERT INTO sedes (nombre, activo) VALUES ('Gimnasio Sur - Los Flores', 1)`)
     sedeSur = { id: newId }
-    console.log('✓ Sede Gimnasio Sur - Los Flores creada')
   } else {
     await sequelize.query(`UPDATE sedes SET nombre = 'Gimnasio Sur - Los Flores', activo = 1 WHERE id = ${sedeSur.id}`)
   }
 
   // Desactivar todas las demás sedes
   await sequelize.query(`UPDATE sedes SET activo = 0 WHERE id NOT IN (${sedePrincipal.id}, ${sedeSur.id})`)
-  console.log('✓ Sedes normalizadas (Principal Suarez + Sur Los Flores)')
+  console.log(`✓ Sedes normalizadas: id=${sedePrincipal.id} Principal Suarez | id=${sedeSur.id} Sur Los Flores`)
 
-  // Mover todos los grupos activos a sede principal, excepto los de Flores
+  // Todos los grupos activos → sede principal, excepto los de Flores
   await sequelize.query(`UPDATE actividades SET sede_id = ${sedePrincipal.id} WHERE activo = 1 AND nombre NOT LIKE '%Flores%'`)
-  // Grupos Flores → sede Sur
+  // Grupos Flores → sede Sur (activos e inactivos)
   await sequelize.query(`UPDATE actividades SET sede_id = ${sedeSur.id} WHERE nombre LIKE '%Flores%'`)
   console.log('✓ Grupos reasignados por sede')
 }
