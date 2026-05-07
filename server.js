@@ -177,6 +177,37 @@ async function migrar() {
     )
     console.log('✓ Actividad Danza Fusión creada')
   }
+
+  // ── 8. Sedes: dejar solo Gimnasio Principal Suarez y Gimnasio Sur - Los Flores ──
+  // Asegurar que existe Gimnasio Principal Suarez
+  let [[sedePrincipal]] = await sequelize.query(`SELECT id FROM sedes WHERE nombre LIKE '%Principal%' OR nombre LIKE '%Suarez%' OR nombre LIKE '%Suárez%' LIMIT 1`)
+  if (!sedePrincipal) {
+    const [newId] = await sequelize.query(`INSERT INTO sedes (nombre, activo) VALUES ('Gimnasio Principal Suarez', 1)`)
+    sedePrincipal = { id: newId }
+    console.log('✓ Sede Gimnasio Principal Suarez creada')
+  } else {
+    await sequelize.query(`UPDATE sedes SET nombre = 'Gimnasio Principal Suarez', activo = 1 WHERE id = ${sedePrincipal.id}`)
+  }
+
+  // Asegurar que existe Gimnasio Sur - Los Flores
+  let [[sedeSur]] = await sequelize.query(`SELECT id FROM sedes WHERE nombre LIKE '%Sur%' OR nombre LIKE '%Flores%' LIMIT 1`)
+  if (!sedeSur) {
+    const [newId] = await sequelize.query(`INSERT INTO sedes (nombre, activo) VALUES ('Gimnasio Sur - Los Flores', 1)`)
+    sedeSur = { id: newId }
+    console.log('✓ Sede Gimnasio Sur - Los Flores creada')
+  } else {
+    await sequelize.query(`UPDATE sedes SET nombre = 'Gimnasio Sur - Los Flores', activo = 1 WHERE id = ${sedeSur.id}`)
+  }
+
+  // Desactivar todas las demás sedes
+  await sequelize.query(`UPDATE sedes SET activo = 0 WHERE id NOT IN (${sedePrincipal.id}, ${sedeSur.id})`)
+  console.log('✓ Sedes normalizadas (Principal Suarez + Sur Los Flores)')
+
+  // Mover todos los grupos activos a sede principal, excepto los de Flores
+  await sequelize.query(`UPDATE actividades SET sede_id = ${sedePrincipal.id} WHERE activo = 1 AND nombre NOT LIKE '%Flores%'`)
+  // Grupos Flores → sede Sur
+  await sequelize.query(`UPDATE actividades SET sede_id = ${sedeSur.id} WHERE nombre LIKE '%Flores%'`)
+  console.log('✓ Grupos reasignados por sede')
 }
 
 async function start() {
